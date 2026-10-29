@@ -165,3 +165,26 @@ IO_PORT "probe[5]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
 //   84 TFT_DC  <- mot_ain2
 //   85 TFT_RES <- mot_pwm （LCD 长期复位，不通信、低功耗）
 //   86/87 编码器输入不变（CS 不激活 → LCD 不会驱动 SDA，无争用）
+
+# ===== 2026-10-24 新增：板上按键 K1~K7（按下为低，内部上拉）=====
+IO_LOC "key[0]" 58;   IO_PORT "key[0]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+IO_LOC "key[1]" 59;   IO_PORT "key[1]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+IO_LOC "key[2]" 60;   IO_PORT "key[2]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+IO_LOC "key[3]" 61;   IO_PORT "key[3]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+IO_LOC "key[4]" 62;   IO_PORT "key[4]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+IO_LOC "key[5]" 63;   IO_PORT "key[5]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+IO_LOC "key[6]" 64;   IO_PORT "key[6]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+# ===== 4 位数码管（共阳极，段选/位选均低电平有效）=====
+IO_LOC "smg[0]" 138;  IO_PORT "smg[0]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "smg[1]" 142;  IO_PORT "smg[1]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "smg[2]" 9;    IO_PORT "smg[2]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "smg[3]" 7;    IO_PORT "smg[3]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "smg[4]" 12;   IO_PORT "smg[4]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "smg[5]" 139;  IO_PORT "smg[5]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "smg[6]" 8;    IO_PORT "smg[6]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "smg[7]" 10;   IO_PORT "smg[7]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "dig[0]" 137;  IO_PORT "dig[0]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "dig[1]" 140;  IO_PORT "dig[1]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "dig[2]" 141;  IO_PORT "dig[2]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "dig[3]" 3;    IO_PORT "dig[3]" IO_TYPE=LVCMOS33 DRIVE=8;
