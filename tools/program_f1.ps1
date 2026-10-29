@@ -10,8 +10,8 @@
     powershell -NoProfile -ExecutionPolicy Bypass -File program_f1.ps1 -Mode scan
 #>
 param(
-    [string]$Gowin    = 'E:\Installation_package\Gowin\Gowin_V1.9.11.03_Education_x64',
-    [string]$Project  = 'E:\Installation_package\Gowin\Gowin_V1.9.11.03_Education_x64\IDE\bin\Documents\f1_attitude',
+    [string]$Gowin    = '',      # 留空则自动探测 Gowin EDA 安装目录
+    [string]$Project  = '',      # 留空则用 %TEMP%\f1_flash（中文路径中转用）
     [ValidateSet('scan', 'sram', 'sram-noverify', 'flash')]
     [string]$Mode     = 'sram-noverify',
     [string]$Fs       = '',
@@ -19,10 +19,37 @@ param(
     [int]$CableIndex  = -1
 )
 
+# ---------- 自动定位 Gowin EDA ----------
+if (-not $Gowin) {
+    $roots = @('C:\Gowin', 'D:\Gowin', 'E:\Gowin',
+               'C:\Program Files\Gowin', 'C:\Program Files (x86)\Gowin',
+               'D:\Program Files\Gowin', 'E:\Installation_package\Gowin')
+    $hits = @()
+    foreach ($r in $roots) {
+        if (-not (Test-Path $r)) { continue }
+        $hits += Get-ChildItem $r -Recurse -Filter 'programmer_cli.exe' -File -ErrorAction SilentlyContinue |
+                 ForEach-Object { Split-Path (Split-Path $_.DirectoryName -Parent) -Parent }
+    }
+    if (-not $hits) {
+        throw "未找到 Gowin EDA。请用 -Gowin 指定安装根目录（其下应有 Programmer\bin\programmer_cli.exe）。"
+    }
+    $Gowin = $hits | Sort-Object -Descending | Select-Object -First 1
+}
+
+# ---------- 中文路径中转目录（不存在就创建）----------
+if (-not $Project) { $Project = Join-Path $env:TEMP 'f1_flash' }
+if (-not (Test-Path $Project)) { New-Item -ItemType Directory -Force -Path $Project | Out-Null }
+
 $cli = Join-Path $Gowin 'Programmer\bin\programmer_cli.exe'
-if (-not (Test-Path $cli)) { throw "找不到 programmer_cli.exe：$cli" }
-if ([string]::IsNullOrEmpty($Fs)) { $Fs = Join-Path $Project 'impl\pnr\f1_attitude.fs' }
-if (-not (Test-Path $Fs)) { throw "找不到码流文件：$Fs" }
+if (-not (Test-Path $cli)) { throw "找不到 programmer_cli.exe：$cli`n请用 -Gowin 指定 Gowin EDA 安装根目录。" }
+
+# scan 模式只探测下载线，不需要码流文件
+if ($Mode -ne 'scan') {
+    if ([string]::IsNullOrEmpty($Fs)) { throw "请用 -Fs 指定要烧录的 .fs 文件。" }
+    if (-not (Test-Path $Fs)) { throw "找不到码流文件：$Fs" }
+}
+
+Write-Host ("Gowin    : " + $Gowin) -ForegroundColor DarkGray
 
 if ($Fs -match '[^\x00-\x7F]') {
     $dst = Join-Path $Project 'flash_tmp.fs'

@@ -13,13 +13,14 @@
 param(
     [int]$Stage = 5,
     [int]$I2cDiv = 1000,
-    [string]$OutName = 'f1_balance.fs',
-    [string]$GowinBin = ''          # gw_sh.exe 所在目录；留空则自动探测
+    [string]$OutName = 'f1_rebuild.fs',   # 刻意不叫交付固件的名字，避免与它混淆
+    [string]$OutDir = '',                 # 留空 = 包内 重建\ ，不污染 固件\
+    [string]$GowinBin = ''                # gw_sh.exe 所在目录；留空则自动探测
 )
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
-$fwDir = Join-Path $root '固件'
+if ($OutDir) { $fwDir = $OutDir } else { $fwDir = Join-Path $root '重建' }
 
 # 源文件目录：支持两种布局
 #   扁平布局  源码\*.v  + 源码\*.cst        （交付包：锦辉）
@@ -157,12 +158,20 @@ if (-not (Test-Path $fs)) {
     exit 1
 }
 $errn = (Select-String -Path $log -Pattern 'ERROR' | Measure-Object).Count
-if ($errn -ne 0) {
-    Write-Host "日志里有 $errn 条 ERROR，请先检查。" -ForegroundColor Red
-    Select-String -Path $log -Pattern 'ERROR' | Select-Object -First 10 | ForEach-Object { "  " + $_.Line.Trim() }
+# gw_sh 会尝试往 AppData\LocalLow\GowinSemi\IDE\cache\sh.log 写日志，
+# 无权限时产生 3 条 "failed to open log file" 的 ERROR，与综合无关。
+$benign = (Select-String -Path $log -Pattern "failed to open log file|sh\.log" | Measure-Object).Count
+$realErr = $errn - $benign
+if ($realErr -gt 0) {
+    Write-Host "日志里有 $realErr 条实质 ERROR，请先检查。" -ForegroundColor Red
+    Select-String -Path $log -Pattern 'ERROR' |
+        Where-Object { $_.Line -notmatch 'failed to open log file|sh\.log' } |
+        Select-Object -First 10 | ForEach-Object { "  " + $_.Line.Trim() }
+} elseif ($benign -gt 0) {
+    Write-Host "（已忽略 $benign 条 gw_sh 缓存日志写入失败的无害提示）" -ForegroundColor DarkGray
 }
 
-# ---------- 5) 归档到 固件\ ----------
+# ---------- 5) 归档到 重建\（默认，不污染交付用的 固件\）----------
 if (-not (Test-Path $fwDir)) { New-Item -ItemType Directory -Force -Path $fwDir | Out-Null }
 $dst = Join-Path $fwDir $OutName
 Copy-Item $fs $dst -Force
@@ -195,11 +204,20 @@ $origPd = $srcDirs | ForEach-Object { Join-Path $_ 'pd_ctrl.v' } | Where-Object 
 $sha1Top = (Get-FileHash $origTop -Algorithm SHA1).Hash
 $sha1Pd = (Get-FileHash $origPd -Algorithm SHA1).Hash
 
+# 与交付固件 sidecar 一致的筛选与折算常量
+$jumpEff = [int][math]::Floor(17.0 * 205.0 * $I2cDiv / 50000.0)
+$rejEff = 3
+$sclHz = [math]::Round(50000000.0 / (4.0 * $I2cDiv), 0)
+
 $side = @(
     "file      : $OutName",
     "built     : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')",
     "STAGE     : $Stage",
     "OS_CLKDIV : $I2cDiv",
+    "median    : on (1 sample group delay)",
+    "ang_max_jump : $jumpEff (auto from rate)",
+    "ang_rej_max  : $rejEff (auto)",
+    "scl_hz    : $sclHz",
     "trans_ms  : $([math]::Round(205*$I2cDiv/50000.0,1))",
     "trans_hz  : $([math]::Round($hz,1))",
     "checksum  : $cs",
