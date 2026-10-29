@@ -1,0 +1,49 @@
+# ---- Gowin / 综合产物 ----
+*.fs
+*.fs.txt
+*.bin
+*.bit
+impl/
+*.log
+*.rpt
+*.srs
+*.html
+!README.md
+
+# ---- Gowin EDA 工程中间文件 ----
+*.gprj.user
+*.gprj.bak
+*.ipc
+*.ipuser
+*.rao
+*.crowtemp
+*.gws
+*.gao
+*.tr
+*.pwr
+*.json
+tmp/
+Documents/
+
+# ---- 仿真 ----
+*.vcd
+*.fst
+*.ghw
+*.wlf
+xsim.dir/
+sim_build/
+__pycache__/
+
+# ---- 数据与日志（不入库）----
+*.csv
+*.txt
+!requirements.txt
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+*.swp
+*~
+Thumbs.db
+desktop.ini
+.DS_Store

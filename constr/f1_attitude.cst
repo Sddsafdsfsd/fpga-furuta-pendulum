@@ -1,0 +1,167 @@
+// ============================================================================
+//  f1_attitude.cst  ——  PocketLab-F1 (GW1N-9 / EQFP144) 管脚约束
+// ----------------------------------------------------------------------------
+//  管脚号来源：《Pocket Lab-F1 FPGA开发套件用户手册》武汉易思达 ES9101
+//      时钟  : 表 3-4   CLK_50MHZ_IN = 11
+//      LED   : 表 3-8   FPGA_LED1..8 = 23..30
+//      串口  : 表 3-13  FPGA_TXD = 48 / FPGA_RXD = 49（板载 CH340）
+//      ADC1  : 表 3-18-1  3PA1030：OE=15  CLK=32  OVR=34  D0..D9=47,46,45,44,43,42,41,40,39,38
+//      舵机  : 表 3-20  DUOJI_PWM = 80
+//  说明：手册里信号名 GPIO_xx 的后缀就是管脚号（GPIO_47=管脚47），可自校验。
+//  注意：按键(表3-6)/数码管(表3-10)/三色LED(表3-11)/拨码(表3-12) 的引脚表在
+//        文本提取中有错位，本工程刻意不使用它们，避免踩坑。
+//
+//  【避坑记录】Gowin 的 cst 不支持对总线整体写 IO_PORT "led[7:0]"，
+//  必须像官方例子（IDE\data\examples\led_water）那样逐位写。否则该组引脚会
+//  退回默认 LVCMOS18，并把所在 Bank 锁成 1.8V，引发一大串 BANK_VCCIO 冲突。
+// ============================================================================
+
+// ---------------- 50MHz 有源晶振 ----------------
+IO_LOC "clk_50m" 11;
+IO_PORT "clk_50m" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+// ---------------- 8 个蓝色 LED ----------------
+// 如果灯的左右顺序反了，把这里的编号倒过来即可
+IO_LOC "led[0]" 23;
+IO_PORT "led[0]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "led[1]" 24;
+IO_PORT "led[1]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "led[2]" 25;
+IO_PORT "led[2]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "led[3]" 26;
+IO_PORT "led[3]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "led[4]" 27;
+IO_PORT "led[4]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "led[5]" 28;
+IO_PORT "led[5]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "led[6]" 29;
+IO_PORT "led[6]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "led[7]" 30;
+IO_PORT "led[7]" IO_TYPE=LVCMOS33 DRIVE=8;
+
+// ---------------- 板载 CH340 串口 ----------------
+IO_LOC "uart_tx" 48;
+IO_PORT "uart_tx" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "uart_rx" 49;
+IO_PORT "uart_rx" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+// ---------------- 舵机 PWM ----------------
+IO_LOC "servo_pwm" 50;
+IO_PORT "servo_pwm" IO_TYPE=LVCMOS33 DRIVE=8;
+
+// ---------------- ADC1 (3PA1030 并行 ADC) ----------------
+IO_LOC "ad_clk" 32;
+IO_PORT "ad_clk" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "ad_oe" 15;
+IO_PORT "ad_oe" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "ad_ovr" 34;
+IO_PORT "ad_ovr" IO_TYPE=LVCMOS33;
+
+IO_LOC "ad_d[0]" 47;
+IO_PORT "ad_d[0]" IO_TYPE=LVCMOS33;
+IO_LOC "ad_d[1]" 46;
+IO_PORT "ad_d[1]" IO_TYPE=LVCMOS33;
+IO_LOC "ad_d[2]" 45;
+IO_PORT "ad_d[2]" IO_TYPE=LVCMOS33;
+IO_LOC "ad_d[3]" 44;
+IO_PORT "ad_d[3]" IO_TYPE=LVCMOS33;
+IO_LOC "ad_d[4]" 43;
+IO_PORT "ad_d[4]" IO_TYPE=LVCMOS33;
+IO_LOC "ad_d[5]" 42;
+IO_PORT "ad_d[5]" IO_TYPE=LVCMOS33;
+IO_LOC "ad_d[6]" 41;
+IO_PORT "ad_d[6]" IO_TYPE=LVCMOS33;
+IO_LOC "ad_d[7]" 40;
+IO_PORT "ad_d[7]" IO_TYPE=LVCMOS33;
+IO_LOC "ad_d[8]" 39;
+IO_PORT "ad_d[8]" IO_TYPE=LVCMOS33;
+IO_LOC "ad_d[9]" 38;
+IO_PORT "ad_d[9]" IO_TYPE=LVCMOS33;
+
+// ============================================================================
+//  STAGE=5：编码器 + TB6612 电机驱动（全部走 12 脚 PMOD）
+// ----------------------------------------------------------------------------
+//  这 6 个脚（GPIO_82~87）本来是 SPI LCD 的，所以 STAGE=5 时**不能插 LCD 屏**。
+//  PMOD 引脚对照：IO1=80(舵机) IO2=81(DHT11) IO3=82 IO4=83 IO5=84 IO6=85 IO7=86 IO8=87
+//  建议接线：
+//      IO3 -> TB6612 PWMA      IO7 -> 编码器 A 相
+//      IO4 -> TB6612 AIN1      IO8 -> 编码器 B 相
+//      IO5 -> TB6612 AIN2
+//      IO6 -> TB6612 STBY      （TB6612 的 VM 用 12V 电源，GND 与开发板共地！）
+// ============================================================================
+
+// ---------------- 编码器 A/B ----------------
+IO_LOC "enc_a" 86;
+IO_PORT "enc_a" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+IO_LOC "enc_b" 87;
+IO_PORT "enc_b" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+// ---------------- TB6612 电机驱动 ----------------
+IO_LOC "mot_pwm" 85;
+IO_PORT "mot_pwm" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "mot_ain1" 83;
+IO_PORT "mot_ain1" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "mot_ain2" 84;
+IO_PORT "mot_ain2" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "mot_stby" 82;
+IO_PORT "mot_stby" IO_TYPE=LVCMOS33 DRIVE=8;
+
+// ============================================================================
+//  STAGE=6：DAC1 并口（3PD5651E）—— 用于 DAC -> ADC 模拟环回自检
+//  管脚来自手册 表 3-19-1：DA1_CLK=GPIO_136，DA1_DATA0..9=GPIO_124,126,128..135
+//  这些脚经 J3 排针引出，同时连到板上 DAC 的数据输入；不做 DAC 实验时它们不动作，
+//  但**这一版会持续翻转**，所以别在这几个脚上接别的东西。
+// ============================================================================
+IO_LOC "dac_clk_out" 136;
+IO_PORT "dac_clk_out" IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "dac_d[0]" 124;
+IO_PORT "dac_d[0]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "dac_d[1]" 126;
+IO_PORT "dac_d[1]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "dac_d[2]" 128;
+IO_PORT "dac_d[2]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "dac_d[3]" 129;
+IO_PORT "dac_d[3]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "dac_d[4]" 130;
+IO_PORT "dac_d[4]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "dac_d[5]" 131;
+IO_PORT "dac_d[5]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "dac_d[6]" 132;
+IO_PORT "dac_d[6]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "dac_d[7]" 133;
+IO_PORT "dac_d[7]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "dac_d[8]" 134;
+IO_PORT "dac_d[8]" IO_TYPE=LVCMOS33 DRIVE=8;
+IO_LOC "dac_d[9]" 135;
+IO_PORT "dac_d[9]" IO_TYPE=LVCMOS33 DRIVE=8;
+
+// ---- AS5600 I2C（走 PMOD：IO1=GPIO_80 = SCL, IO2=GPIO_81 = SDA）----
+//      改用 PMOD 是因为 J3 上的 88/90 被扩展板挡住插不进线
+//      舵机让出 80 号脚，挪到空闲的 50 号（本项目不用舵机）
+IO_LOC "i2c_scl" 80;
+IO_PORT "i2c_scl" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+IO_LOC "i2c_sda" 81;
+IO_PORT "i2c_sda" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+// ---- 引脚探测端口（正式版分配到 J4 上的空闲脚，不影响功能）----
+IO_LOC "probe[0]" 51;
+IO_PORT "probe[0]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+IO_LOC "probe[1]" 52;
+IO_PORT "probe[1]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+IO_LOC "probe[2]" 54;
+IO_PORT "probe[2]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+IO_LOC "probe[3]" 56;
+IO_PORT "probe[3]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+IO_LOC "probe[4]" 57;
+IO_PORT "probe[4]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+IO_LOC "probe[5]" 66;
+IO_PORT "probe[5]" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+
+// ===== LCD 友好版：重排 PMOD 引脚，避免激活板载 LCD =====
+//   82 TFT_BL  <- mot_stby（静态高，背光常亮、无 PWM）
+//   83 TFT_CS  <- mot_ain1（仅换向时变，LCD 几乎不被片选）
+//   84 TFT_DC  <- mot_ain2
+//   85 TFT_RES <- mot_pwm （LCD 长期复位，不通信、低功耗）
+//   86/87 编码器输入不变（CS 不激活 → LCD 不会驱动 SDA，无争用）
