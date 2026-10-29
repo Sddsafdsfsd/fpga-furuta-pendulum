@@ -2,13 +2,17 @@
 #
 # 用法（在包根目录或任意位置执行均可）：
 #   powershell -ExecutionPolicy Bypass -File .\工具\build_pd.ps1
-#   powershell -ExecutionPolicy Bypass -File .\工具\build_pd.ps1 -Stage 5 -I2cDiv 1000 -OutName f1_balance.fs
+#   powershell -ExecutionPolicy Bypass -File .\工具\build_pd.ps1 -Stage 5 -I2cDiv 1000 -OutName f1_rebuild.fs
 #
-# 本脚本自带工程：每次运行会在包内创建 build\ 目录，把 源码\ 复制进去，
-# 现场生成 f1_attitude.gprj 与 build.tcl，再用 Gowin 的 gw_sh 综合。
+# 本脚本自带工程：每次运行会
+#   1) 把 源码\（或 rtl\ + constr\）复制到系统临时目录 %TEMP%\f1_build_xxxx\ 下；
+#   2) 在那里现场生成 f1_attitude.gprj 与 build.tcl；
+#   3) 调用 Gowin 的 gw_sh 综合；
+#   4) 把比特流与构建记录放进包内 重建\（默认，可用 -OutDir 改）。
+# 用临时目录是因为 Gowin 的 Tcl 控制台不处理非 ASCII 路径（中文目录会失败）。
 # 不需要事先用 Gowin IDE 建工程，也不会改动 源码\ 里的任何文件。
 #
-# 默认参数对应交付固件 User Code 0xE931。
+# 默认参数对应交付固件 User Code 0xE931（重建结果的 CheckSum 应与之一致）。
 
 param(
     [int]$Stage = 5,
@@ -157,18 +161,20 @@ if (-not (Test-Path $fs)) {
         Select-Object -First 15 | ForEach-Object { "  " + $_.Line.Trim() }
     exit 1
 }
-$errn = (Select-String -Path $log -Pattern 'ERROR' | Measure-Object).Count
-# gw_sh 会尝试往 AppData\LocalLow\GowinSemi\IDE\cache\sh.log 写日志，
-# 无权限时产生 3 条 "failed to open log file" 的 ERROR，与综合无关。
-$benign = (Select-String -Path $log -Pattern "failed to open log file|sh\.log" | Measure-Object).Count
-$realErr = $errn - $benign
+# 只把 Gowin 自己输出的错误行算作实质错误，格式为  ERROR  (PR0003) : ...
+# 其余被匹配到的行都是 PowerShell 对原生命令 stderr 的包装
+# （+ CategoryInfo / + FullyQualifiedErrorId : NativeCommandError 等），
+# 以及 gw_sh 往 AppData\LocalLow 写缓存日志失败的无害提示。
+$realErrLines = Select-String -Path $log -Pattern '^\s*ERROR\s*\(\w+\)' -ErrorAction SilentlyContinue
+$realErr = ($realErrLines | Measure-Object).Count
+$benign = (Select-String -Path $log -Pattern "failed to open log file|sh\.log|NativeCommandError|CategoryInfo|FullyQualifiedErrorId" -ErrorAction SilentlyContinue |
+           Measure-Object).Count
+
 if ($realErr -gt 0) {
-    Write-Host "日志里有 $realErr 条实质 ERROR，请先检查。" -ForegroundColor Red
-    Select-String -Path $log -Pattern 'ERROR' |
-        Where-Object { $_.Line -notmatch 'failed to open log file|sh\.log' } |
-        Select-Object -First 10 | ForEach-Object { "  " + $_.Line.Trim() }
+    Write-Host "综合日志里有 $realErr 条 Gowin 报错，请先检查。" -ForegroundColor Red
+    $realErrLines | Select-Object -First 10 | ForEach-Object { "  " + $_.Line.Trim() }
 } elseif ($benign -gt 0) {
-    Write-Host "（已忽略 $benign 条 gw_sh 缓存日志写入失败的无害提示）" -ForegroundColor DarkGray
+    Write-Host "（已忽略 $benign 条与综合无关的提示：缓存日志写入失败 / PowerShell 命令包装）" -ForegroundColor DarkGray
 }
 
 # ---------- 5) 归档到 重建\（默认，不污染交付用的 固件\）----------
@@ -204,7 +210,11 @@ $origPd = $srcDirs | ForEach-Object { Join-Path $_ 'pd_ctrl.v' } | Where-Object 
 $sha1Top = (Get-FileHash $origTop -Algorithm SHA1).Hash
 $sha1Pd = (Get-FileHash $origPd -Algorithm SHA1).Hash
 
-# 与交付固件 sidecar 一致的筛选与折算常量
+# 中值滤波状态：从源码里 MEDIAN_BYPASS 的实际取值读出来，不硬编码
+$medParam = [regex]::Match(([System.IO.File]::ReadAllText((Join-Path $bSrc 'top.v'))), 'parameter\s+integer\s+MEDIAN_BYPASS\s*=\s*(\d+)')
+if ($medParam.Success -and [int]$medParam.Groups[1].Value -eq 1) { $medStr = 'BYPASS (MEDIAN_BYPASS=1)' } else { $medStr = 'on (1 sample group delay, MEDIAN_BYPASS=0)' }
+
+# 与交付固件 sidecar 一致的折算常量
 $jumpEff = [int][math]::Floor(17.0 * 205.0 * $I2cDiv / 50000.0)
 $rejEff = 3
 $sclHz = [math]::Round(50000000.0 / (4.0 * $I2cDiv), 0)
@@ -214,7 +224,7 @@ $side = @(
     "built     : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')",
     "STAGE     : $Stage",
     "OS_CLKDIV : $I2cDiv",
-    "median    : on (1 sample group delay)",
+    "median    : $medStr",
     "ang_max_jump : $jumpEff (auto from rate)",
     "ang_rej_max  : $rejEff (auto)",
     "scl_hz    : $sclHz",
